@@ -1,0 +1,279 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GTA 5 RP CAD/MDT</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="container mx-auto p-4">
+    <h1 class="text-3xl font-bold text-center mb-6">GTA 5 RP CAD/MDT System</h1>
+
+    <!-- Navigation -->
+    <nav class="flex justify-around mb-6 bg-blue-600 text-white p-4 rounded">
+      <button onclick="showSection('dispatch')" class="hover:bg-blue-700 px-4 py-2 rounded">Dispatch</button>
+      <button onclick="showSection('units')" class="hover:bg-blue-700 px-4 py-2 rounded">Units</button>
+      <button onclick="showSection('dmv')" class="hover:bg-blue-700 px-4 py-2 rounded">DMV</button>
+      <button onclick="showSection('warrants')" class="hover:bg-blue-700 px-4 py-2 rounded">Warrants/BOLOs</button>
+      <button onclick="showSection('civilian')" class="hover:bg-blue-700 px-4 py-2 rounded">Civilian</button>
+    </nav>
+
+    <!-- Dispatch Section -->
+    <section id="dispatch" class="section">
+      <h2 class="text-2xl font-semibold mb-4">Dispatch Dashboard</h2>
+      <div class="mb-4">
+        <h3 class="text-lg font-medium">Create 911 Call</h3>
+        <input id="callLocation" type="text" placeholder="Location" class="border p-2 m-2 w-full">
+        <input id="callDescription" type="text" placeholder="Description" class="border p-2 m-2 w-full">
+        <select id="callPriority" class="border p-2 m-2">
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+        </select>
+        <button onclick="addCall()" class="bg-blue-600 text-white px-4 py-2 rounded">Log Call</button>
+      </div>
+      <h3 class="text-lg font-medium">Active Calls</h3>
+      <ul id="callList" class="list-disc pl-5"></ul>
+    </section>
+
+    <!-- Units Section -->
+    <section id="units" class="section hidden">
+      <h2 class="text-2xl font-semibold mb-4">Unit Management</h2>
+      <div class="mb-4">
+        <h3 class="text-lg font-medium">Add Unit</h3>
+        <input id="unitId" type="text" placeholder="Unit ID (e.g., P-101)" class="border p-2 m-2">
+        <select id="unitType" class="border p-2 m-2">
+          <option value="Police">Police</option>
+          <option value="EMS">EMS</option>
+          <option value="Fire">Fire</option>
+        </select>
+        <select id="unitStatus" class="border p-2 m-2">
+          <option value="Available">Available</option>
+          <option value="On Call">On Call</option>
+          <option value="Busy">Busy</option>
+        </select>
+        <button onclick="addUnit()" class="bg-blue-600 text-white px-4 py-2 rounded">Add Unit</button>
+      </div>
+      <h3 class="text-lg font-medium">Active Units</h3>
+      <ul id="unitList" class="list-disc pl-5"></ul>
+    </section>
+
+    <!-- DMV Section -->
+    <section id="dmv" class="section hidden">
+      <h2 class="text-2xl font-semibold mb-4">DMV Database</h2>
+      <div class="mb-4">
+        <h3 class="text-lg font-medium">Add Vehicle/License</h3>
+        <input id="dmvPlate" type="text" placeholder="Plate/License Number" class="border p-2 m-2">
+        <input id="dmvOwner" type="text" placeholder="Owner Name" class="border p-2 m-2">
+        <select id="dmvType" class="border p-2 m-2">
+          <option value="Vehicle">Vehicle</option>
+          <option value="License">License</option>
+        </select>
+        <input id="dmvStatus" type="text" placeholder="Status (e.g., Valid, Suspended)" class="border p-2 m-2">
+        <button onclick="addDmvRecord()" class="bg-blue-600 text-white px-4 py-2 rounded">Add Record</button>
+      </div>
+      <h3 class="text-lg font-medium">Search Records</h3>
+      <input id="dmvSearch" type="text" placeholder="Search by Plate/Name" class="border p-2 m-2 w-full">
+      <button onclick="searchDmv()" class="bg-blue-600 text-white px-4 py-2 rounded">Search</button>
+      <ul id="dmvList" class="list-disc pl-5"></ul>
+    </section>
+
+    <!-- Warrants/BOLOs Section -->
+    <section id="warrants" class="section hidden">
+      <h2 class="text-2xl font-semibold mb-4">Warrants & BOLOs</h2>
+      <div class="mb-4">
+        <h3 class="text-lg font-medium">Add Warrant/BOLO</h3>
+        <input id="warrantName" type="text" placeholder="Suspect/Subject Name" class="border p-2 m-2">
+        <input id="warrantReason" type="text" placeholder="Reason" class="border p-2 m-2">
+        <select id="warrantType" class="border p-2 m-2">
+          <option value="Warrant">Warrant</option>
+          <option value="BOLO">BOLO</option>
+        </select>
+        <button onclick="addWarrant()" class="bg-blue-600 text-white px-4 py-2 rounded">Add</button>
+      </div>
+      <h3 class="text-lg font-medium">Active Warrants/BOLOs</h3>
+      <ul id="warrantList" class="list-disc pl-5"></ul>
+    </section>
+
+    <!-- Civilian Section -->
+    <section id="civilian" class="section hidden">
+      <h2 class="text-2xl font-semibold mb-4">Civilian Portal</h2>
+      <div class="mb-4">
+        <h3 class="text-lg font-medium">Submit Report</h3>
+        <input id="civilianName" type="text" placeholder="Your Name" class="border p-2 m-2 w-full">
+        <textarea id="civilianReport" placeholder="Report Details" class="border p-2 m-2 w-full"></textarea>
+        <button onclick="submitReport()" class="bg-blue-600 text-white px-4 py-2 rounded">Submit</button>
+      </div>
+      <h3 class="text-lg font-medium">Reports</h3>
+      <ul id="reportList" class="list-disc pl-5"></ul>
+    </section>
+  </div>
+
+  <script>
+    // Initialize localStorage data
+    const calls = JSON.parse(localStorage.getItem('calls')) || [];
+    const units = JSON.parse(localStorage.getItem('units')) || [];
+    const dmvRecords = JSON.parse(localStorage.getItem('dmvRecords')) || [];
+    const warrants = JSON.parse(localStorage.getItem('warrants')) || [];
+    const reports = JSON.parse(localStorage.getItem('reports')) || [];
+
+    // Show/hide sections
+    function showSection(sectionId) {
+      document.querySelectorAll('.section').forEach(section => section.classList.add('hidden'));
+      document.getElementById(sectionId).classList.remove('hidden');
+    }
+
+    // Dispatch: Add Call
+    function addCall() {
+      const location = document.getElementById('callLocation').value;
+      const description = document.getElementById('callDescription').value;
+      const priority = document.getElementById('callPriority').value;
+      if (location && description) {
+        calls.push({ id: Date.now(), location, description, priority });
+        localStorage.setItem('calls', JSON.stringify(calls));
+        renderCalls();
+        document.getElementById('callLocation').value = '';
+        document.getElementById('callDescription').value = '';
+      }
+    }
+
+    function renderCalls() {
+      const callList = document.getElementById('callList');
+      callList.innerHTML = calls.map(call => `<li>${call.priority} Priority: ${call.location} - ${call.description}</li>`).join('');
+    }
+
+    // Units: Add Unit
+    function addUnit() {
+      const unitId = document.getElementById('unitId').value;
+      const unitType = document.getElementById('unitType').value;
+      const unitStatus = document.getElementById('unitStatus').value;
+      if (unitId) {
+        units.push({ id: unitId, type: unitType, status: unitStatus });
+        localStorage.setItem('units', JSON.stringify(units));
+        renderUnits();
+        document.getElementById('unitId').value = '';
+      }
+    }
+
+    function renderUnits() {
+      const unitList = document.getElementById('unitList');
+      unitList.innerHTML = units.map(unit => `<li>${unit.id} (${unit.type}): ${unit.status}</li>`).join('');
+    }
+
+    // DMV: Add Record
+    function addDmvRecord() {
+      const plate = document.getElementById('dmvPlate').value;
+      const owner = document.getElementById('dmvOwner').value;
+      const type = document.getElementById('dmvType').value;
+      const status = document.getElementById('dmvStatus').value;
+      if (plate && owner) {
+        dmvRecords.push({ plate, owner, type, status });
+        localStorage.setItem('dmvRecords', JSON.stringify(dmvRecords));
+        renderDmv();
+        document.getElementById('dmvPlate').value = '';
+        document.getElementById('dmvOwner').value = '';
+        document.getElementById('dmvStatus').value = '';
+      }
+    }
+
+    function searchDmv() {
+      const query = document.getElementById('dmvSearch').value.toLowerCase();
+      const filtered = dmvRecords.filter(record => 
+        record.plate.toLowerCase().includes(query) || record.owner.toLowerCase().includes(query)
+      );
+      const dmvList = document.getElementById('dmvList');
+      dmvList.innerHTML = filtered.map(record => `<li>${record.type}: ${record.plate} - ${record.owner} (${record.status})</li>`).join('');
+    }
+
+    function renderDmv() {
+      const dmvList = document.getElementById('dmvList');
+      dmvList.innerHTML = dmvRecords.map(record => `<li>${record.type}: ${record.plate} - ${record.owner} (${record.status})</li>`).join('');
+    }
+
+    // Warrants: Add Warrant/BOLO
+    function addWarrant() {
+      const name = document.getElementById('warrantName').value;
+      const reason = document.getElementById('warrantReason').value;
+      const type = document.getElementById('warrantType').value;
+      if (name && reason) {
+        warrants.push({ id: Date.now(), name, reason, type });
+        localStorage.setItem('warrants', JSON.stringify(warrants));
+        renderWarrants();
+        document.getElementById('warrantName').value = '';
+        document.getElementById('warrantReason').value = '';
+      }
+    }
+
+    function renderWarrants() {
+      const warrantList = document.getElementById('warrantList');
+      warrantList.innerHTML = warrants.map(warrant => `<li>${warrant.type}: ${warrant.name} - ${warrant.reason}</li>`).join('');
+    }
+
+    // Civilian: Submit Report
+    function submitReport() {
+      const name = document.getElementById('civilianName').value;
+      const report = document.getElementById('civilianReport').value;
+      if (name && report) {
+        reports.push({ id: Date.now(), name, report });
+        localStorage.setItem('reports', JSON.stringify(reports));
+        renderReports();
+        document.getElementById('civilianName').value = '';
+        document.getElementById('civilianReport').value = '';
+      }
+    }
+
+    function renderReports() {
+      const reportList = document.getElementById('reportList');
+      reportList.innerHTML = reports.map(report => `<li>${report.name}: ${report.report}</li>`).join('');
+    }
+
+    // Initial render
+    renderCalls();
+    renderUnits();
+    renderDmv();
+    renderWarrants();
+    renderReports();
+    showSection('dispatch');
+  </script>
+</body>
+</html>
